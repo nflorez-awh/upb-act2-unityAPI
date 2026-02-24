@@ -6,185 +6,145 @@ using TMPro;
 
 public class DeckManager : MonoBehaviour
 {
-    [Header("API Falsa - my-json-server")]
-    [SerializeField] private string playersUrl = "https://my-json-server.typicode.com/nflorez-awh/upb-act2-unityAPI/players";
+    [SerializeField]
+    private string playersURL = "https://my-json-server.typicode.com/nflorez-awh/upb-act2-unityAPI/players";
+    [SerializeField]
+    private string rickMortyURL = "https://rickandmortyapi.com/api/character";
+    [SerializeField]
 
-    [Header("API Tercero - Rick and Morty")]
-    private string rickMortyUrl = "https://rickandmortyapi.com/api/character";
+    private TMP_Text playerNameText;
+    [SerializeField]
+    private TMP_Text playerIndexText;
+    [SerializeField]
 
-    [Header("UI - Jugador")]
-    [SerializeField] private TMP_Text playerNameText;
-    [SerializeField] private TMP_Text playerIndexText;
-    [SerializeField] private TMP_Text developerNameText;
-    [SerializeField] private TMP_Text statusText;
+    private TMP_Text statusText;
 
-    [Header("UI - Baraja")]
-    [SerializeField] private Transform cardsContainer;
-    [SerializeField] private GameObject cardPrefab;
+    [SerializeField]
+    private Transform cardsContainer;
+    [SerializeField]
+    private GameObject cardPrefab;
 
-    [Header("UI - Navegacion")]
-    [SerializeField] private Button prevButton;
-    [SerializeField] private Button nextButton;
+    [SerializeField]
+    private Button prevButton;
+    [SerializeField]
+    private Button nextButton;
 
-    [Header("Configuracion")]
-    [SerializeField] private string developerFullName = "Tu Nombre Completo";
-
-    private Player[] allPlayers;
-    private int currentPlayerIndex = 0;
+    private Player[] players;
+    private int currentIndex = 0;
 
     void Start()
     {
-        if (developerNameText != null)
-            developerNameText.text = developerFullName;
-
-        if (prevButton != null)
-            prevButton.onClick.AddListener(PreviousPlayer);
-        if (nextButton != null)
-            nextButton.onClick.AddListener(NextPlayer);
-
+        prevButton.onClick.AddListener(PreviousPlayer);
+        nextButton.onClick.AddListener(NextPlayer);
         StartCoroutine(GetPlayers());
     }
 
-    // ─────────────────────────────────────────────
-    // PASO 1: Consultar API falsa
-    // my-json-server devuelve un array directo
-    // por eso necesitamos el wrapper
-    // ─────────────────────────────────────────────
     IEnumerator GetPlayers()
     {
-        SetStatus("Cargando jugadores...");
+        statusText.text = "Cargando jugadores...";
 
-        UnityWebRequest www = UnityWebRequest.Get(playersUrl);
+        UnityWebRequest www = UnityWebRequest.Get(playersURL);
         yield return www.SendWebRequest();
 
         if (www.result != UnityWebRequest.Result.Success)
         {
-            SetStatus("Error: " + www.error);
-            yield break;
+            Debug.Log(www.error);
+            statusText.text = "Error: " + www.error;
         }
-
-        // my-json-server devuelve un array [] — necesita wrapper
-        string json = "{\"players\":" + www.downloadHandler.text + "}";
-        PlayerList list = JsonUtility.FromJson<PlayerList>(json);
-
-        if (list == null || list.players == null || list.players.Length == 0)
+        else
         {
-            SetStatus("Error: no se encontraron jugadores.");
-            yield break;
-        }
+            string json = "{\"players\":" + www.downloadHandler.text + "}";
+            PlayerList list = JsonUtility.FromJson<PlayerList>(json);
+            players = list.players;
 
-        allPlayers = list.players;
-        SetStatus(allPlayers.Length + " jugadores cargados.");
-        DisplayPlayer(allPlayers[0]);
+            Debug.Log("Jugadores cargados: " + players.Length);
+            ShowPlayer(players[currentIndex]);
+        }
     }
 
-    // ─────────────────────────────────────────────
-    // PASO 2: Mostrar jugador y su baraja
-    // ─────────────────────────────────────────────
-    void DisplayPlayer(Player player)
+    void ShowPlayer(Player player)
     {
-        if (playerNameText != null)
-            playerNameText.text = player.name;
-
-        if (playerIndexText != null)
-            playerIndexText.text = (currentPlayerIndex + 1) + " / " + allPlayers.Length;
+        playerNameText.text = player.name;
+        playerIndexText.text = (currentIndex + 1) + " / " + players.Length;
 
         foreach (Transform child in cardsContainer)
             Destroy(child.gameObject);
 
-        StartCoroutine(LoadDeck(player.deck));
+        StartCoroutine(GetDeck(player.deck));
     }
 
-    // ─────────────────────────────────────────────
-    // PASO 3: Por cada ID consultar Rick and Morty
-    // ─────────────────────────────────────────────
-    IEnumerator LoadDeck(int[] cardIds)
+    IEnumerator GetDeck(int[] deck)
     {
-        SetStatus("Cargando baraja...");
+        statusText.text = "Cargando baraja...";
 
-        foreach (int cardId in cardIds)
+        foreach (int cardId in deck)
         {
-            SetStatus("Cargando carta #" + cardId + "...");
+            UnityWebRequest www = UnityWebRequest.Get(rickMortyURL + "/" + cardId);
+            yield return www.SendWebRequest();
 
-            UnityWebRequest req = UnityWebRequest.Get(rickMortyUrl + "/" + cardId);
-            yield return req.SendWebRequest();
-
-            if (req.result != UnityWebRequest.Result.Success)
+            if (www.result != UnityWebRequest.Result.Success)
             {
-                Debug.LogWarning("Error carta " + cardId + ": " + req.error);
-                continue;
-            }
-
-            RickMortyCharacter character =
-                JsonUtility.FromJson<RickMortyCharacter>(req.downloadHandler.text);
-
-            SpawnCard(character);
-            yield return new WaitForSeconds(0.1f);
-        }
-
-        SetStatus("Baraja lista.");
-    }
-
-    // ─────────────────────────────────────────────
-    // Crear carta en la UI y cargar su imagen
-    // ─────────────────────────────────────────────
-    void SpawnCard(RickMortyCharacter character)
-    {
-        GameObject cardObj = Instantiate(cardPrefab, cardsContainer);
-        CardDisplay display = cardObj.GetComponent<CardDisplay>();
-
-        if (display != null)
-            display.SetData(character);
-
-        StartCoroutine(LoadImage(character.image, display));
-    }
-
-    IEnumerator LoadImage(string url, CardDisplay display)
-    {
-        using (UnityWebRequest uwr = UnityWebRequestTexture.GetTexture(url))
-        {
-            yield return uwr.SendWebRequest();
-
-            if (uwr.result == UnityWebRequest.Result.Success)
-            {
-                Texture2D tex = DownloadHandlerTexture.GetContent(uwr);
-                if (display != null)
-                    display.SetImage(tex);
+                Debug.Log(www.error);
+                if (www.responseCode == 404)
+                    Debug.Log("Carta no encontrada: " + cardId);
             }
             else
             {
-                Debug.LogWarning("Error imagen: " + uwr.error);
+                Character character = JsonUtility.FromJson<Character>(www.downloadHandler.text);
+                Debug.Log(character.name + " is a " + character.species);
+
+                GameObject cardObj = Instantiate(cardPrefab, cardsContainer);
+                CardDisplay display = cardObj.GetComponent<CardDisplay>();
+                display.SetData(character);
+
+                StartCoroutine(GetTexture(character.image, display));
+            }
+
+            yield return new WaitForSeconds(0.1f);
+        }
+
+        statusText.text = "Baraja lista.";
+    }
+
+    IEnumerator GetTexture(string imageUrl, CardDisplay display)
+    {
+        using (UnityWebRequest uwr = UnityWebRequestTexture.GetTexture(imageUrl))
+        {
+            yield return uwr.SendWebRequest();
+
+            if (uwr.result != UnityWebRequest.Result.Success)
+            {
+                Debug.Log(uwr.error);
+            }
+            else
+            {
+                var texture = DownloadHandlerTexture.GetContent(uwr);
+                display.SetImage(texture);
             }
         }
     }
 
-    // ─────────────────────────────────────────────
-    // Navegacion entre jugadores
-    // ─────────────────────────────────────────────
     public void NextPlayer()
     {
-        if (allPlayers == null) return;
-        currentPlayerIndex = (currentPlayerIndex + 1) % allPlayers.Length;
-        DisplayPlayer(allPlayers[currentPlayerIndex]);
+        currentIndex = (currentIndex + 1) % players.Length;
+        ShowPlayer(players[currentIndex]);
     }
 
     public void PreviousPlayer()
     {
-        if (allPlayers == null) return;
-        currentPlayerIndex = (currentPlayerIndex - 1 + allPlayers.Length) % allPlayers.Length;
-        DisplayPlayer(allPlayers[currentPlayerIndex]);
-    }
-
-    void SetStatus(string msg)
-    {
-        if (statusText != null) statusText.text = msg;
-        Debug.Log(msg);
+        currentIndex = (currentIndex - 1 + players.Length) % players.Length;
+        ShowPlayer(players[currentIndex]);
     }
 }
 
-// ─────────────────────────────────────────────
-// MODELOS DE DATOS
-// ─────────────────────────────────────────────
+[System.Serializable]
+public class Character
+{
+    public int id;
+    public string name;
+    public string species;
+    public string image;
+}
 
 [System.Serializable]
 public class Player
@@ -198,14 +158,4 @@ public class Player
 public class PlayerList
 {
     public Player[] players;
-}
-
-[System.Serializable]
-public class RickMortyCharacter
-{
-    public int id;
-    public string name;
-    public string species;
-    public string status;
-    public string image;
 }
