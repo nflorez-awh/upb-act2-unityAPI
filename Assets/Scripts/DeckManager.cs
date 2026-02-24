@@ -6,15 +6,14 @@ using TMPro;
 
 public class DeckManager : MonoBehaviour
 {
-    [Header("API Jugadores — JSONPlaceholder")]
-    [SerializeField] private string usersApiUrl = "https://jsonplaceholder.typicode.com/users";
+    [Header("API Falsa - Tu db.json")]
+    [SerializeField] private string dbJsonUrl = "https://raw.githubusercontent.com/nflorez-awh/upb-act2-unityAPI/refs/heads/main/db.json";
 
-    [Header("API Baraja — Deck of Cards")]
-    private string deckApiBase = "https://deckofcardsapi.com/api/deck";
+    [Header("API Tercero - Rick and Morty")]
+    private string rickMortyUrl = "https://rickandmortyapi.com/api/character";
 
-    [Header("UI - Info Jugador")]
+    [Header("UI - Jugador")]
     [SerializeField] private TMP_Text playerNameText;
-    [SerializeField] private TMP_Text playerIdText;
     [SerializeField] private TMP_Text playerIndexText;
     [SerializeField] private TMP_Text developerNameText;
     [SerializeField] private TMP_Text statusText;
@@ -23,22 +22,17 @@ public class DeckManager : MonoBehaviour
     [SerializeField] private Transform cardsContainer;
     [SerializeField] private GameObject cardPrefab;
 
-    [Header("UI - Navegación")]
+    [Header("UI - Navegacion")]
     [SerializeField] private Button prevButton;
     [SerializeField] private Button nextButton;
 
-    [Header("UI - Robar carta")]
-    [SerializeField] private Button drawCardButton;
-    [SerializeField] private TMP_Text remainingCardsText;
-
-    [Header("Configuración")]
-    [SerializeField] private int cardsPerPlayer = 5;
+    [Header("Configuracion")]
     [SerializeField] private string developerFullName = "Tu Nombre Completo";
 
     private Player[] allPlayers;
     private int currentPlayerIndex = 0;
-    private string currentDeckId = "";
 
+    // ─────────────────────────────────────────────
     void Start()
     {
         if (developerNameText != null)
@@ -48,28 +42,28 @@ public class DeckManager : MonoBehaviour
             prevButton.onClick.AddListener(PreviousPlayer);
         if (nextButton != null)
             nextButton.onClick.AddListener(NextPlayer);
-        if (drawCardButton != null)
-            drawCardButton.onClick.AddListener(OnDrawCardPressed);
 
-        SetDrawButtonState(false);
         StartCoroutine(GetPlayers());
     }
 
+    // ─────────────────────────────────────────────
+    // PASO 1: Consultar la API falsa
+    // ─────────────────────────────────────────────
     IEnumerator GetPlayers()
     {
         SetStatus("Cargando jugadores...");
 
-        UnityWebRequest www = UnityWebRequest.Get(usersApiUrl);
+        UnityWebRequest www = UnityWebRequest.Get(dbJsonUrl);
         yield return www.SendWebRequest();
 
         if (www.result != UnityWebRequest.Result.Success)
         {
-            SetStatus("Error: " + www.error);
+            SetStatus("Error cargando jugadores: " + www.error);
             yield break;
         }
 
-        string json = "{\"players\":" + www.downloadHandler.text + "}";
-        PlayerList list = JsonUtility.FromJson<PlayerList>(json);
+        // El db.json ya tiene el objeto raiz players — sin wrapper
+        PlayerList list = JsonUtility.FromJson<PlayerList>(www.downloadHandler.text);
 
         if (list == null || list.players == null || list.players.Length == 0)
         {
@@ -78,95 +72,70 @@ public class DeckManager : MonoBehaviour
         }
 
         allPlayers = list.players;
-        SetStatus($"{allPlayers.Length} jugadores encontrados.");
+        SetStatus(allPlayers.Length + " jugadores cargados.");
         DisplayPlayer(allPlayers[0]);
     }
 
+    // ─────────────────────────────────────────────
+    // PASO 2: Mostrar jugador actual
+    // ─────────────────────────────────────────────
     void DisplayPlayer(Player player)
     {
-        // Solo ID y nombre
-        if (playerIdText != null) playerIdText.text = "#" + player.id;
-        if (playerNameText != null) playerNameText.text = player.name;
-        if (playerIndexText != null) playerIndexText.text = $"{currentPlayerIndex + 1} / {allPlayers.Length}";
+        if (playerNameText != null)
+            playerNameText.text = player.name;
 
+        if (playerIndexText != null)
+            playerIndexText.text = (currentPlayerIndex + 1) + " / " + allPlayers.Length;
+
+        // Limpiar cartas anteriores
         foreach (Transform child in cardsContainer)
             Destroy(child.gameObject);
 
-        SetDrawButtonState(false);
-        currentDeckId = "";
-
-        StartCoroutine(ShuffleAndDraw());
+        // Cargar cartas del jugador
+        StartCoroutine(LoadDeck(player.deck));
     }
 
-    IEnumerator ShuffleAndDraw()
+    // ─────────────────────────────────────────────
+    // PASO 3: Por cada ID consultar Rick and Morty
+    // ─────────────────────────────────────────────
+    IEnumerator LoadDeck(int[] cardIds)
     {
-        SetStatus("Barajando mazo...");
+        SetStatus("Cargando baraja...");
 
-        UnityWebRequest req = UnityWebRequest.Get($"{deckApiBase}/new/shuffle/?deck_count=1");
-        yield return req.SendWebRequest();
-
-        if (req.result != UnityWebRequest.Result.Success)
+        foreach (int cardId in cardIds)
         {
-            SetStatus("Error creando mazo: " + req.error);
-            yield break;
+            UnityWebRequest req = UnityWebRequest.Get(rickMortyUrl + "/" + cardId);
+            yield return req.SendWebRequest();
+
+            if (req.result != UnityWebRequest.Result.Success)
+            {
+                Debug.LogWarning("Error carta " + cardId + ": " + req.error);
+                continue;
+            }
+
+            RickMortyCharacter character =
+                JsonUtility.FromJson<RickMortyCharacter>(req.downloadHandler.text);
+
+            SpawnCard(character);
+
+            yield return new WaitForSeconds(0.1f);
         }
 
-        DeckResponse deck = JsonUtility.FromJson<DeckResponse>(req.downloadHandler.text);
-        currentDeckId = deck.deck_id;
-
-        yield return StartCoroutine(DrawCards(cardsPerPlayer));
-        SetDrawButtonState(true);
+        SetStatus("Baraja lista.");
     }
 
-    IEnumerator DrawCards(int count)
-    {
-        SetStatus($"Repartiendo {count} carta(s)...");
-
-        UnityWebRequest req = UnityWebRequest.Get($"{deckApiBase}/{currentDeckId}/draw/?count={count}");
-        yield return req.SendWebRequest();
-
-        if (req.result != UnityWebRequest.Result.Success)
-        {
-            SetStatus("Error robando cartas: " + req.error);
-            yield break;
-        }
-
-        DrawResponse response = JsonUtility.FromJson<DrawResponse>(req.downloadHandler.text);
-
-        if (!response.success)
-        {
-            SetStatus("No quedan cartas en el mazo.");
-            SetDrawButtonState(false);
-            yield break;
-        }
-
-        foreach (CardData card in response.cards)
-        {
-            SpawnCard(card);
-            yield return new WaitForSeconds(0.05f);
-        }
-
-        if (remainingCardsText != null)
-            remainingCardsText.text = $"Quedan {response.remaining} cartas";
-
-        SetStatus($"✅ Listo. Quedan {response.remaining} cartas.");
-
-        if (response.remaining == 0)
-            SetDrawButtonState(false);
-    }
-
-    public void OnDrawCardPressed()
-    {
-        if (string.IsNullOrEmpty(currentDeckId)) return;
-        StartCoroutine(DrawCards(1));
-    }
-
-    void SpawnCard(CardData card)
+    // ─────────────────────────────────────────────
+    // Crear carta en la UI
+    // ─────────────────────────────────────────────
+    void SpawnCard(RickMortyCharacter character)
     {
         GameObject cardObj = Instantiate(cardPrefab, cardsContainer);
         CardDisplay display = cardObj.GetComponent<CardDisplay>();
-        if (display != null) display.SetData(card);
-        StartCoroutine(LoadImage(card.image, display));
+
+        if (display != null)
+            display.SetData(character);
+
+        StartCoroutine(LoadImage(character.image, display));
     }
 
     IEnumerator LoadImage(string url, CardDisplay display)
@@ -174,14 +143,19 @@ public class DeckManager : MonoBehaviour
         using (UnityWebRequest uwr = UnityWebRequestTexture.GetTexture(url))
         {
             yield return uwr.SendWebRequest();
+
             if (uwr.result == UnityWebRequest.Result.Success)
             {
                 Texture2D tex = DownloadHandlerTexture.GetContent(uwr);
-                if (display != null) display.SetImage(tex);
+                if (display != null)
+                    display.SetImage(tex);
             }
         }
     }
 
+    // ─────────────────────────────────────────────
+    // Navegacion entre jugadores
+    // ─────────────────────────────────────────────
     public void NextPlayer()
     {
         if (allPlayers == null) return;
@@ -196,12 +170,6 @@ public class DeckManager : MonoBehaviour
         DisplayPlayer(allPlayers[currentPlayerIndex]);
     }
 
-    void SetDrawButtonState(bool state)
-    {
-        if (drawCardButton != null)
-            drawCardButton.interactable = state;
-    }
-
     void SetStatus(string msg)
     {
         if (statusText != null) statusText.text = msg;
@@ -210,7 +178,7 @@ public class DeckManager : MonoBehaviour
 }
 
 // ─────────────────────────────────────────────
-// MODELOS
+// MODELOS DE DATOS
 // ─────────────────────────────────────────────
 
 [System.Serializable]
@@ -218,6 +186,7 @@ public class Player
 {
     public int id;
     public string name;
+    public int[] deck;
 }
 
 [System.Serializable]
@@ -227,27 +196,11 @@ public class PlayerList
 }
 
 [System.Serializable]
-public class DeckResponse
+public class RickMortyCharacter
 {
-    public bool success;
-    public string deck_id;
-    public int remaining;
-}
-
-[System.Serializable]
-public class DrawResponse
-{
-    public bool success;
-    public string deck_id;
-    public CardData[] cards;
-    public int remaining;
-}
-
-[System.Serializable]
-public class CardData
-{
-    public string code;
+    public int id;
+    public string name;
+    public string species;
+    public string status;
     public string image;
-    public string value;
-    public string suit;
 }
