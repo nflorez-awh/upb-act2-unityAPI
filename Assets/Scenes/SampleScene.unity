@@ -680,7 +680,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 26adec0223b12c746bc11215a7c72345, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DeckManager
-  deckApiUrl: https://my-json-server.typicode.com/TU_USUARIO/TU_REPO/players
+  deckApiUrl: https://raw.githubusercontent.com/nflorez-awh/upb-act2-unityAPI/refs/heads/main/db.json
   rickMortyUrl: https://rickandmortyapi.com/api/character
   playerNameText: {fileID: 1109228507}
   developerNameText: {fileID: 652138773}

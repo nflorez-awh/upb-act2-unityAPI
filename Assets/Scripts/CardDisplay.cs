@@ -4,21 +4,22 @@ using TMPro;
 
 public class CardDisplay : MonoBehaviour
 {
-    [SerializeField] private TMP_Text nameText;
-    [SerializeField] private TMP_Text speciesText;
-    [SerializeField] private TMP_Text idText;
-    [SerializeField] private RawImage characterImage;
+    [SerializeField] private RawImage cardImage;
+    [SerializeField] private TMP_Text cardNameText;
+    [SerializeField] private TMP_Text cardSuitText;
 
-    public void SetData(RickMortyCharacter character)
+    public void SetData(CardData card)
     {
-        nameText.text = character.name;
-        speciesText.text = character.species + " · " + character.status;
-        idText.text = "#" + character.id;
+        if (cardNameText != null)
+            cardNameText.text = card.value;
+
+        if (cardSuitText != null)
+            cardSuitText.text = card.suit;
     }
 
     public void SetImage(Texture2D texture)
     {
-        if (characterImage != null)
-            characterImage.texture = texture;
+        if (cardImage != null)
+            cardImage.texture = texture;
     }
 }

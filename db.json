@@ -3,9 +3,6 @@
         {
             "id": 1,
             "name": "Nelson Pérez",
-            "level": 10,
-            "wins": 42,
-            "losses": 8,
             "deck": [
                 1,
                 2,
@@ -17,9 +14,6 @@
         {
             "id": 2,
             "name": "Ana Gómez",
-            "level": 7,
-            "wins": 28,
-            "losses": 15,
             "deck": [
                 6,
                 7,
@@ -31,9 +25,6 @@
         {
             "id": 3,
             "name": "Carlos Ruiz",
-            "level": 15,
-            "wins": 60,
-            "losses": 5,
             "deck": [
                 11,
                 12,
@@ -45,9 +36,6 @@
         {
             "id": 4,
             "name": "María Torres",
-            "level": 5,
-            "wins": 10,
-            "losses": 20,
             "deck": [
                 16,
                 17,
@@ -59,9 +47,6 @@
         {
             "id": 5,
             "name": "Luis Herrera",
-            "level": 20,
-            "wins": 95,
-            "losses": 3,
             "deck": [
                 21,
                 22,
