@@ -6,8 +6,8 @@ using TMPro;
 
 public class DeckManager : MonoBehaviour
 {
-    [Header("API Falsa - Tu db.json")]
-    [SerializeField] private string dbJsonUrl = "https://raw.githubusercontent.com/nflorez-awh/upb-act2-unityAPI/refs/heads/main/db.json";
+    [Header("API Falsa - my-json-server")]
+    [SerializeField] private string playersUrl = "https://my-json-server.typicode.com/nflorez-awh/upb-act2-unityAPI/players";
 
     [Header("API Tercero - Rick and Morty")]
     private string rickMortyUrl = "https://rickandmortyapi.com/api/character";
@@ -32,7 +32,6 @@ public class DeckManager : MonoBehaviour
     private Player[] allPlayers;
     private int currentPlayerIndex = 0;
 
-    // ─────────────────────────────────────────────
     void Start()
     {
         if (developerNameText != null)
@@ -47,23 +46,26 @@ public class DeckManager : MonoBehaviour
     }
 
     // ─────────────────────────────────────────────
-    // PASO 1: Consultar la API falsa
+    // PASO 1: Consultar API falsa
+    // my-json-server devuelve un array directo
+    // por eso necesitamos el wrapper
     // ─────────────────────────────────────────────
     IEnumerator GetPlayers()
     {
         SetStatus("Cargando jugadores...");
 
-        UnityWebRequest www = UnityWebRequest.Get(dbJsonUrl);
+        UnityWebRequest www = UnityWebRequest.Get(playersUrl);
         yield return www.SendWebRequest();
 
         if (www.result != UnityWebRequest.Result.Success)
         {
-            SetStatus("Error cargando jugadores: " + www.error);
+            SetStatus("Error: " + www.error);
             yield break;
         }
 
-        // El db.json ya tiene el objeto raiz players — sin wrapper
-        PlayerList list = JsonUtility.FromJson<PlayerList>(www.downloadHandler.text);
+        // my-json-server devuelve un array [] — necesita wrapper
+        string json = "{\"players\":" + www.downloadHandler.text + "}";
+        PlayerList list = JsonUtility.FromJson<PlayerList>(json);
 
         if (list == null || list.players == null || list.players.Length == 0)
         {
@@ -77,7 +79,7 @@ public class DeckManager : MonoBehaviour
     }
 
     // ─────────────────────────────────────────────
-    // PASO 2: Mostrar jugador actual
+    // PASO 2: Mostrar jugador y su baraja
     // ─────────────────────────────────────────────
     void DisplayPlayer(Player player)
     {
@@ -87,11 +89,9 @@ public class DeckManager : MonoBehaviour
         if (playerIndexText != null)
             playerIndexText.text = (currentPlayerIndex + 1) + " / " + allPlayers.Length;
 
-        // Limpiar cartas anteriores
         foreach (Transform child in cardsContainer)
             Destroy(child.gameObject);
 
-        // Cargar cartas del jugador
         StartCoroutine(LoadDeck(player.deck));
     }
 
@@ -104,6 +104,8 @@ public class DeckManager : MonoBehaviour
 
         foreach (int cardId in cardIds)
         {
+            SetStatus("Cargando carta #" + cardId + "...");
+
             UnityWebRequest req = UnityWebRequest.Get(rickMortyUrl + "/" + cardId);
             yield return req.SendWebRequest();
 
@@ -117,7 +119,6 @@ public class DeckManager : MonoBehaviour
                 JsonUtility.FromJson<RickMortyCharacter>(req.downloadHandler.text);
 
             SpawnCard(character);
-
             yield return new WaitForSeconds(0.1f);
         }
 
@@ -125,7 +126,7 @@ public class DeckManager : MonoBehaviour
     }
 
     // ─────────────────────────────────────────────
-    // Crear carta en la UI
+    // Crear carta en la UI y cargar su imagen
     // ─────────────────────────────────────────────
     void SpawnCard(RickMortyCharacter character)
     {
@@ -149,6 +150,10 @@ public class DeckManager : MonoBehaviour
                 Texture2D tex = DownloadHandlerTexture.GetContent(uwr);
                 if (display != null)
                     display.SetImage(tex);
+            }
+            else
+            {
+                Debug.LogWarning("Error imagen: " + uwr.error);
             }
         }
     }
