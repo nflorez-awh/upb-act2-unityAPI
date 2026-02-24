@@ -1,0 +1,40 @@
+{
+    "players": [
+        {
+            "id": 1,
+            "name": "Nelson Pérez",
+            "cards": [
+                {
+                    "id": 101,
+                    "name": "As de Espadas"
+                },
+                {
+                    "id": 102,
+                    "name": "Rey de Corazones"
+                },
+                {
+                    "id": 103,
+                    "name": "Reina de Diamantes"
+                }
+            ]
+        },
+        {
+            "id": 2,
+            "name": "Ana Gómez",
+            "cards": [
+                {
+                    "id": 201,
+                    "name": "Dos de Tréboles"
+                },
+                {
+                    "id": 202,
+                    "name": "Tres de Corazones"
+                },
+                {
+                    "id": 203,
+                    "name": "Cuatro de Diamantes"
+                }
+            ]
+        }
+    ]
+}
